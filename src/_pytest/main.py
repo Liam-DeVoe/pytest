@@ -16,6 +16,7 @@ import importlib.util
 import os
 from pathlib import Path
 import sys
+import threading
 from typing import final
 from typing import Literal
 from typing import overload
@@ -554,8 +555,6 @@ class Session(nodes.Collector):
 
     Interrupted = Interrupted
     Failed = Failed
-    # Set on the session by runner.pytest_sessionstart.
-    _setupstate: SetupState
     # Set on the session by fixtures.pytest_sessionstart.
     _fixturemanager: FixtureManager
     exitstatus: int | ExitCode
@@ -585,6 +584,20 @@ class Session(nodes.Collector):
         self._bestrelpathcache: dict[Path, str] = _bestrelpath_cache(config.rootpath)
 
         self.config.pluginmanager.register(self, name="session")
+
+        self._setupstate_local = threading.local()
+
+    @property
+    def _setupstate(self) -> SetupState:
+        try:
+            _ = self._setupstate_local.value
+        except AttributeError:
+            self._setupstate = SetupState()
+        return self._setupstate_local.value
+
+    @_setupstate.setter
+    def _setupstate(self, setupstate: SetupState) -> None:
+        self._setupstate_local.value = setupstate
 
     @classmethod
     def from_config(cls, config: Config) -> Session:

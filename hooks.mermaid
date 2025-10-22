@@ -1,0 +1,201 @@
+%%{init: {'layout': 'elk', 'theme':'base', 'themeVariables': { 'fontSize':'14px'}, 'flowchart':{'nodeSpacing': 50, 'rankSpacing': 60, 'curve':'basis'}}}%%
+flowchart TD
+    Start([pytest invocation]) --> Bootstrap
+
+    subgraph Bootstrap[" 1. BOOTSTRAP "]
+        B1[pytest_cmdline_parse]
+        B2[pytest_load_initial_conftests]
+        B1 --> B2
+    end
+
+    Bootstrap --> Init
+
+    subgraph Init[" 2. INITIALIZATION "]
+        I1[pytest_addhooks]
+        I2[pytest_plugin_registered]
+        I3[pytest_addoption]
+        I4[pytest_configure]
+        I5[pytest_cmdline_main]
+        I1 --> I2 --> I3 --> I4 --> I5
+    end
+
+    Init --> Session
+
+    subgraph Session[" 3. SESSION START "]
+        S1[pytest_sessionstart]
+        S2[pytest_report_header]
+        S1 --> S2
+    end
+
+    Session --> Collection
+
+    subgraph Collection[" 4. COLLECTION "]
+        C1[pytest_collection]
+        C2[pytest_ignore_collect]
+        C3[pytest_collect_directory]
+        C4[pytest_collect_file]
+        C5[pytest_pycollect_makemodule]
+        C6[pytest_pycollect_makeitem]
+        C7[pytest_collectstart]
+        C8[pytest_make_collect_report]
+        C9[pytest_itemcollected]
+        C10[pytest_collectreport]
+        C11[pytest_collection_modifyitems]
+        C12[pytest_deselected]
+        C13[pytest_collection_finish]
+        C14[pytest_report_collectionfinish]
+
+        C1 --> C2 --> C3 --> C4
+        C4 --> C5 --> C6
+        C6 --> C7 --> C8
+        C8 --> C9 --> C10
+        C10 --> C11
+        C11 -.->|if items filtered| C12
+        C11 --> C13 --> C14
+    end
+
+    Collection --> TestLoop
+
+    subgraph TestLoop[" 5. TEST EXECUTION LOOP "]
+        TL1[pytest_runtestloop]
+        TL2{For each item}
+        TL3[pytest_runtest_protocol]
+
+        TL1 --> TL2
+        TL2 -->|next item| TL3
+        TL3 --> Protocol
+        Protocol --> TL2
+    end
+
+    subgraph Protocol[" RUNTEST PROTOCOL "]
+        P1[pytest_runtest_logstart]
+
+        subgraph Setup[" Setup Phase "]
+            P2[pytest_runtest_setup]
+            P3[pytest_runtest_makereport]
+            P4[pytest_runtest_logreport]
+            P2 --> P3 --> P4
+        end
+
+        subgraph Call[" Call Phase "]
+            P5[pytest_runtest_call]
+            P6[pytest_pyfunc_call]
+            P7[pytest_runtest_makereport]
+            P8[pytest_runtest_logreport]
+            P5 --> P6 --> P7 --> P8
+        end
+
+        subgraph Teardown[" Teardown Phase "]
+            P9[pytest_runtest_teardown]
+            P10[pytest_runtest_makereport]
+            P11[pytest_runtest_logreport]
+            P9 --> P10 --> P11
+        end
+
+        P12[pytest_runtest_logfinish]
+
+        P1 --> Setup
+        Setup --> Call
+        Call --> Teardown
+        Teardown --> P12
+    end
+
+    TestLoop -->|all items done| Finish
+
+    subgraph Finish[" 6. SESSION END "]
+        F1[pytest_terminal_summary]
+        F2[pytest_sessionfinish]
+        F3[pytest_unconfigure]
+        F1 --> F2 --> F3
+    end
+
+    Finish --> End([pytest exits])
+
+    %% Fixture hooks
+    subgraph FixtureHooks[" FIXTURE HOOKS "]
+        FH1[pytest_fixture_setup]
+        FH2[pytest_fixture_post_finalizer]
+    end
+
+    Setup -.->|called during| FH1
+    Teardown -.->|called during| FH2
+
+    %% Parametrization hooks
+    subgraph ParamHooks[" PARAMETRIZATION HOOKS "]
+        PH1[pytest_generate_tests]
+        PH2[pytest_make_parametrize_id]
+    end
+
+    C6 -.->|may invoke| PH1
+    PH1 -.-> PH2
+
+    %% Reporting hooks
+    subgraph ReportHooks[" REPORTING HOOKS "]
+        RH1[pytest_report_teststatus]
+        RH2[pytest_report_to_serializable]
+        RH3[pytest_report_from_serializable]
+    end
+
+    P4 -.->|may invoke| RH1
+    P8 -.->|may invoke| RH1
+    P11 -.->|may invoke| RH1
+
+    %% Assertion hooks
+    subgraph AssertHooks[" ASSERTION HOOKS "]
+        AH1[pytest_assertrepr_compare]
+        AH2[pytest_assertion_pass]
+    end
+
+    Call -.->|on assertion| AH1
+    Call -.->|on assertion| AH2
+
+    %% Skip/Mark evaluation hook
+    subgraph MarkHooks[" SKIP/XFAIL EVALUATION HOOK "]
+        MH1[pytest_markeval_namespace]
+    end
+
+    P2 -.->|evaluate skip/xfail| MH1
+    P5 -.->|evaluate xfail| MH1
+
+    %% Exception/Debug hooks
+    subgraph ExceptionHooks[" EXCEPTION/DEBUG HOOKS "]
+        EH1[pytest_exception_interact]
+        EH2[pytest_internalerror]
+        EH3[pytest_keyboard_interrupt]
+        EH4[pytest_enter_pdb]
+        EH5[pytest_leave_pdb]
+    end
+
+    Protocol -.->|on error| EH1
+    Protocol -.->|on internal error| EH2
+    Protocol -.->|on Ctrl+C| EH3
+    Protocol -.->|on breakpoint| EH4
+    Protocol -.->|on continue| EH5
+
+    %% Warning hooks
+    subgraph WarningHooks[" WARNING HOOKS "]
+        WH1[pytest_warning_recorded]
+    end
+
+    Init -.->|on warning| WH1
+    Collection -.->|on warning| WH1
+    Protocol -.->|on warning| WH1
+
+    %% Styling
+    classDef phaseBox fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef hookNode fill:#fff,stroke:#666,stroke-width:1px
+    classDef fixtureNode fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef reportNode fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef exceptionNode fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef paramNode fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    classDef assertNode fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    classDef markNode fill:#fce4ec,stroke:#ad1457,stroke-width:2px
+
+    class Bootstrap,Init,Session,Collection,TestLoop,Protocol,Setup,Call,Teardown,Finish phaseBox
+    class B1,B2,I1,I2,I3,I4,I5,S1,S2,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,C13,C14,TL1,TL3,P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12,F1,F2,F3 hookNode
+    class FixtureHooks,FH1,FH2 fixtureNode
+    class ReportHooks,RH1,RH2,RH3,WH1,WarningHooks reportNode
+    class ExceptionHooks,EH1,EH2,EH3,EH4,EH5 exceptionNode
+    class ParamHooks,PH1,PH2 paramNode
+    class AssertHooks,AH1,AH2 assertNode
+    class MarkHooks,MH1 markNode
