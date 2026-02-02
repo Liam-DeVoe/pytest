@@ -618,8 +618,6 @@ class Session(nodes.Collector):
         self._initial_parts: list[CollectionArgument] = []
         self._collection_cache: dict[nodes.Collector, CollectReport] = {}
         self.items: list[nodes.Item] = []
-        # track the thread in which each item started execution in
-        self._item_to_thread: dict[nodes.Item, Thread] = {}
         # info about each thread that is running pytest items
         self._thread_info: dict[Thread, ThreadInfo] = {}
 
@@ -631,10 +629,7 @@ class Session(nodes.Collector):
             SetupState
         )
 
-    def _thread_started(
-        self, item: nodes.Item, thread: Thread, pytest_thread_id: PytestThreadId
-    ) -> None:
-        self._item_to_thread[item] = thread
+    def _thread_started(self, thread: Thread, pytest_thread_id: PytestThreadId) -> None:
         if thread not in self._thread_info:
             self._thread_info[thread] = ThreadInfo(
                 thread=thread, pytest_thread_id=pytest_thread_id

@@ -143,7 +143,7 @@ def runtestprotocol(
     if match := re.match(r"^pytest-thread-(\d+)$", thread.name):
         thread_id = PytestThreadId(match.group(1))
         _pytest_thread_id.set(thread_id)
-        item.session._thread_started(item, thread, thread_id)
+        item.session._thread_started(thread, thread_id)
     elif item.session._thread_info:
         raise RuntimeError(
             f"pytest threads must follow the naming convention pytest-thread-{{n}}, "
